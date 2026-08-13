@@ -1,0 +1,138 @@
+# 根据 PKGBUILD 自动打包 picotool 为 Debian/Ubuntu 的 .deb 包
+#
+# 触发方式：
+#   - 推送 tag（如 2.2.0 或 v2.2.0）自动构建
+#   - 推送 master/main 分支按默认版本（PKGBUILD 中的 2.2.0）构建
+#   - 手动 workflow_dispatch，可指定要打包的版本
+#
+# 构建原理：从 GitHub 下载上游 picotool + pico-sdk 源码，
+# 将本仓库的 debian/ 打包目录与 70-picotool.rules 放入源码树，
+# 再用 dpkg-buildpackage 生成 .deb（对应 PKGBUILD 的 cmake 构建与安装内容）。
+#
+# 架构：amd64 与 arm64 均在原生 runner 上构建（arm64 使用 GitHub
+# 原生 ARM64 runner：ubuntu-22.04-arm / ubuntu-24.04-arm），不做交叉编译。
+
+name: Build .deb packages
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+      - 'v[0-9]*'
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要打包的 picotool 版本（如 2.2.0）；留空使用默认值'
+        required: false
+        default: '2.2.0'
+
+jobs:
+  build:
+    name: Build deb (${{ matrix.distro }} / ${{ matrix.arch }})
+    # 原生 runner：amd64 用标准 runner；arm64 用 GitHub 原生 ARM64 runner（公开预览）
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, distro: ubuntu-22.04, runner: ubuntu-22.04 }
+          - { arch: amd64, distro: ubuntu-24.04, runner: ubuntu-24.04 }
+          - { arch: arm64, distro: ubuntu-22.04, runner: ubuntu-22.04-arm }
+          - { arch: arm64, distro: ubuntu-24.04, runner: ubuntu-24.04-arm }
+    container:
+      # 容器与 runner 架构一致，arm64 上会原生拉取 arm64 镜像，无需模拟
+      image: ${{ matrix.distro }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          set -euxo pipefail
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            git ca-certificates wget \
+            build-essential cmake pkg-config \
+            libusb-1.0-0-dev \
+            debhelper devscripts
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euxo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"   # 去掉 tag 上的 v 前缀
+          else
+            VERSION="2.2.0"                  # 默认取 PKGBUILD 中的 pkgver
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download upstream sources
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -euxo pipefail
+          cd "$GITHUB_WORKSPACE"
+          # 与 PKGBUILD 的 source= 一致：上游 tag 归档
+          wget -q "https://github.com/raspberrypi/picotool/archive/refs/tags/${VERSION}.tar.gz" \
+            -O "picotool_${VERSION}.orig.tar.gz"
+          wget -q "https://github.com/raspberrypi/pico-sdk/archive/refs/tags/${VERSION}.tar.gz" \
+            -O "pico-sdk-${VERSION}.tar.gz"
+          tar xzf "picotool_${VERSION}.orig.tar.gz"   # 解压为 picotool-${VERSION}/
+          tar xzf "pico-sdk-${VERSION}.tar.gz"        # 解压为 pico-sdk-${VERSION}/
+          mv "pico-sdk-${VERSION}" pico-sdk           # 固定目录名，debian/rules 里不用写死版本
+
+      - name: Prepare debian packaging
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          DEBEMAIL: maintainer@example.com
+          DEBNAME: Picotool Maintainers
+        run: |
+          set -euxo pipefail
+          cd "$GITHUB_WORKSPACE/picotool-${VERSION}"
+          cp -a "$GITHUB_WORKSPACE/debian" .
+          cp "$GITHUB_WORKSPACE/70-picotool.rules" .
+          chmod +x debian/rules
+          # 同步 changelog 版本号为当前要打包的版本
+          dch --newversion "${VERSION}-1" --distribution unstable \
+            "Automated CI build of picotool ${VERSION}"
+
+      - name: Build deb
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -euxo pipefail
+          cd "$GITHUB_WORKSPACE/picotool-${VERSION}"
+          dpkg-buildpackage -b -us -uc -j"$(nproc)"
+
+      - name: Smoke test (install and run)
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -euxo pipefail
+          cd "$GITHUB_WORKSPACE"
+          DEBIAN_FRONTEND=noninteractive apt-get install -y ./picotool_*.deb
+          picotool version
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: picotool_${{ steps.version.outputs.VERSION }}-1_${{ matrix.distro }}_${{ matrix.arch }}
+          path: |
+            picotool_*.deb
+            picotool_*.buildinfo
+            picotool_*.changes
+          if-no-files-found: error
+
+      - name: Publish release assets
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            picotool_*.deb

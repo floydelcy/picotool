@@ -1,0 +1,16 @@
+Source: picotool
+Section: utils
+Priority: optional
+Maintainer: Picotool Maintainers <floyde.lcy@gmail.com>
+Build-Depends: debhelper-compat (= 13), cmake, pkg-config, libusb-1.0-0-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/raspberrypi/picotool
+
+Package: picotool
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Tool for inspecting RP2040 binaries and interacting with RP2040 devices
+ picotool is a tool for inspecting RP2040 binaries and interacting with RP2040
+ devices. It can inspect binaries in .elf, .hex, .uf2 and .bin formats,
+ read device information from RP2040/RP2350 boards over USB, and interact with
+ the device's BOOTSEL button to enter USB boot mode.

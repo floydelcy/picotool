@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Debian 打包规则，对应 PKGBUILD 的 build()/package() 逻辑：
+#   - cmake Release 构建，prefix=/usr
+#   - 安装二进制、udev 规则、README 文档、许可证
+
+# pico-sdk 与源码解压在同一父目录（见 CI workflow），固定目录名 pico-sdk
+export PICO_SDK_PATH := $(abspath $(CURDIR)/../pico-sdk)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# dh_auto_configure 默认已带 -DCMAKE_INSTALL_PREFIX=/usr
+	dh_auto_configure -- \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+override_dh_install:
+	dh_install
+	# udev 规则（对应 PKGBUILD：安装到 /usr/lib/udev/rules.d/）
+	install -Dm644 $(CURDIR)/70-picotool.rules \
+		-t $(CURDIR)/debian/picotool/usr/lib/udev/rules.d/
+	# 文档（对应 PKGBUILD：安装到 /usr/share/doc/picotool/）
+	install -Dm644 $(CURDIR)/README.md \
+		-t $(CURDIR)/debian/picotool/usr/share/doc/picotool/
+	# 许可证（对应 PKGBUILD：安装到 /usr/share/licenses/picotool/）
+	install -Dm644 $(CURDIR)/LICENSE.TXT \
+		-t $(CURDIR)/debian/picotool/usr/share/licenses/picotool/

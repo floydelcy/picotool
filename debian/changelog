@@ -1,0 +1,5 @@
+picotool (2.2.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging based on PKGBUILD.
+
+ -- Picotool Maintainers <floyde.lcy@gmail.com>  Thu, 13 Aug 2026 00:00:00 +0000
