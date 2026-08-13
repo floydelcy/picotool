@@ -31,20 +31,18 @@ on:
 
 jobs:
   build:
-    name: Build deb (${{ matrix.distro }} / ${{ matrix.arch }})
-    # 原生 runner：amd64 用标准 runner；arm64 用 GitHub 原生 ARM64 runner（公开预览）
+    name: Build deb (${{ matrix.distro }} / arm64)
+    # 原生 ARM64 runner（GitHub 公开预览）
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, distro: ubuntu-22.04, runner: ubuntu-22.04 }
-          - { arch: amd64, distro: ubuntu-24.04, runner: ubuntu-24.04 }
-          - { arch: arm64, distro: ubuntu-22.04, runner: ubuntu-22.04-arm }
-          - { arch: arm64, distro: ubuntu-24.04, runner: ubuntu-24.04-arm }
+          - { arch: arm64, distro: ubuntu-22.04, image: ubuntu:22.04, runner: ubuntu-22.04-arm }
+          - { arch: arm64, distro: ubuntu-24.04, image: ubuntu:24.04, runner: ubuntu-24.04-arm }
     container:
       # 容器与 runner 架构一致，arm64 上会原生拉取 arm64 镜像，无需模拟
-      image: ${{ matrix.distro }}
+      image: ${{ matrix.image }}
 
     steps:
       - name: Checkout
