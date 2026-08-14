@@ -34,6 +34,9 @@ jobs:
     name: Build deb (${{ matrix.distro }} / arm64)
     # 原生 ARM64 runner（GitHub 公开预览）
     runs-on: ${{ matrix.runner }}
+    # 需要 contents: write 才能创建/发布 GitHub Release（默认只读会报 403）
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -134,7 +137,8 @@ jobs:
           if-no-files-found: error
 
       - name: Publish release assets
-        if: github.ref_type == 'tag'
+        # 只由矩阵中的第一个任务发布，避免并发竞争创建 Release
+        if: github.ref_type == 'tag' && matrix.distro == 'ubuntu-24.04'
         uses: softprops/action-gh-release@v2
         with:
           files: |
