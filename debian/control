@@ -14,3 +14,15 @@ Description: Tool for inspecting RP2040 binaries and interacting with RP2040 dev
  devices. It can inspect binaries in .elf, .hex, .uf2 and .bin formats,
  read device information from RP2040/RP2350 boards over USB, and interact with
  the device's BOOTSEL button to enter USB boot mode.
+
+Package: picotool-dev
+Section: libdevel
+Architecture: any
+Depends: picotool (= ${binary:Version}), ${misc:Depends}
+Description: Tool for inspecting RP2040 binaries - development files
+ picotool is a tool for inspecting RP2040 binaries and interacting with RP2040
+ devices.
+ .
+ This package contains the CMake package configuration files that allow
+ other CMake projects to find and use the installed picotool via
+ find_package(picotool CONFIG).

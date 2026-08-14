@@ -128,6 +128,7 @@ jobs:
           name: picotool_${{ steps.version.outputs.VERSION }}-1_${{ matrix.distro }}_${{ matrix.arch }}
           path: |
             picotool_*.deb
+            picotool-dev_*.deb
             picotool_*.buildinfo
             picotool_*.changes
           if-no-files-found: error
@@ -138,3 +139,4 @@ jobs:
         with:
           files: |
             picotool_*.deb
+            picotool-dev_*.deb

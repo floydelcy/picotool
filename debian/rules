@@ -17,6 +17,9 @@ override_dh_auto_configure:
 		-DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
 override_dh_install:
+	# 按 debian/picotool.install 与 debian/picotool-dev.install 分发
+	#   picotool     : usr/bin/picotool（+ 下面手动安装的文件）
+	#   picotool-dev : usr/lib/cmake/picotool/*
 	dh_install
 	# udev 规则（对应 PKGBUILD：安装到 /usr/lib/udev/rules.d/）
 	install -Dm644 $(CURDIR)/70-picotool.rules \
